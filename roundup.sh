@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # [r5]: roundup.5.html
 # [r1t]: roundup-1-test.sh.html
 # [r5t]: roundup-5-test.sh.html
@@ -116,6 +116,32 @@ roundup_trace() {
     sed -n "x;1!{ \$s/\(.*\)/$mag\1$clr/; };1!p;\$x;\$p"
 }
 
+# __Junit report support__
+ROUNDUP_JUNIT_REPORT=${ROUNDUP_JUNIT_REPORT:-junit.xml}
+export ROUNDUP_JUNIT_REPORT
+junit_plan_begin(){
+    cat > ${1} <<EOF
+    <testsuite tests="$2">
+EOF
+}
+junit_plan_end(){
+    cat >> $1 <<EOF
+    </testsuite>
+EOF
+}
+junit_case_success(){
+    cat >> $3 <<EOF
+    <testcase classname="$1" name="$2"/>
+EOF
+}
+junit_case_fail(){
+    cat >> $3 <<EOF
+    <testcase classname="$1" name="$2">
+        <failure type="Unknown"> Fail. </failure>
+    </testcase>
+EOF
+}
+
 # __Other helpers__
 
 # Track the test stats while outputting a real-time report.  This takes input on
@@ -153,6 +179,7 @@ roundup_summarize() {
 
     : ${cols:=10}
 
+    cur_plan="default"
     while read status name
     do
         case $status in
@@ -161,6 +188,7 @@ roundup_summarize() {
             passed=$(expr $passed + 1)
             printf "  %-48s " "$name:"
             printf "$grn[PASS]$clr\n"
+            $(junit_case_success ${cur_plan} $name $roundup_tmp/junit.xml.tmp)
             ;;
         f)
             ntests=$(expr $ntests + 1)
@@ -168,9 +196,11 @@ roundup_summarize() {
             printf "  %-48s " "$name:"
             printf "$red[FAIL]$clr\n"
             roundup_trace < "$roundup_tmp/$name"
+            $(junit_case_fail ${cur_plan} $name $roundup_tmp/junit.xml.tmp)
             ;;
         d)
             printf "%s\n" "$name"
+            cur_plan="${name:-default}"
             ;;
         esac
     done
@@ -183,7 +213,9 @@ roundup_summarize() {
     printf "Passed: %3d | " $passed
     printf "Failed: %3d"    $failed
     printf "\n"
-
+    $(junit_plan_begin ${ROUNDUP_JUNIT_REPORT} $ntests)
+    $([ -f $roundup_tmp/junit.xml.tmp ] && cat $roundup_tmp/junit.xml.tmp >> ${ROUNDUP_JUNIT_REPORT})
+    $(junit_plan_end ${ROUNDUP_JUNIT_REPORT})
     # Exit with an error if any tests failed
     test $failed -eq 0 || exit 2
 }

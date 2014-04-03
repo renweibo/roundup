@@ -5,6 +5,7 @@ written in any POSIX shell.  Each test in a plan is run in its own isolated
 sandbox.  A test can pass, be ignored, or fail.  Failed tests output their `set
 -x` trace.
 
+This fork support junit report xml generate.
 
 More information and examples:
   http://itsbonus.heroku.com/p/2010-11-01-roundup
